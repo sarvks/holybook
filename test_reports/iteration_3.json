@@ -1,0 +1,25 @@
+{
+  "summary": "Iteration 3 testing complete. Backend: 11/11 new pytest tests PASS covering (a) /api/manifesto returns 15 entries incl Preamble with 'not dictated by God' body; (b) Evidence ratings — reader 403 on revise, admin revise with confidence=high, status=established, sources=[{A. Rao/Foundations/2019/peer-reviewed/CC-BY 4.0}] persists and is fetched via GET /api/propositions/1; (c) Tension proposals — reader submits, /api/me/tension-proposals lists it, admin /api/editorial/tension-proposals shows pending, reader 403 on editorial list and decision, admin approval GROWS /api/atlas count by 1, rejection does NOT change count; (d) Voice picker /api/tts with voice=sage returns audio/mpeg 200 and invalid voice ('not-a-real-voice-xyz') falls back gracefully to audio/mpeg 200. Plus regression on stats/books/validation. Frontend: /manifesto renders 'THE OPENING MANIFESTO' with nav-manifesto link and 15 manifesto-entry-* accordions; Preamble expands to show 'This book was not dictated by God.' body text. Home has cta-manifesto ('Read the Manifesto first'). /chapter/97 has voice-picker (<select> with options onyx, sage, fable, nova, alloy, echo, shimmer, coral, ash). /atlas: propose-tension-btn is HIDDEN when unauthenticated and VISIBLE when signed in as reader — full flow works with propose-a/propose-b/propose-theme/propose-rationale/propose-submit. Editorial dashboard as admin shows ed-tab-proposals tab with tension-approve-*/tension-reject-* buttons for pending proposals; Revise/retract tab exposes revise-sources editor with add-source (creates author/work/year/type/license fields) and loaded prop 1 already displays previously-persisted A. Rao / Foundations source from backend test. All critical flows pass.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iter3.py",
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/iter3_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py continues to accumulate features (manifesto, tension-proposals, sources on revise). Router split (auth/corpus/editorial/ask/tts/manifesto) is now overdue.",
+    "Approving a tension proposal permanently mutates the base atlas (per spec) — but there's no admin UI to un-approve or roll back if a mistake is made; consider a soft-delete/withdraw path in a future iteration.",
+    "/tts silently falls back on invalid voice; that is user-friendly but the response gives no signal about which voice was actually used. Consider surfacing the used voice via a response header (e.g., X-TTS-Voice) so clients can reflect the fallback.",
+    "Sources editor persists year as string vs number is not visually validated on client — recommend enforcing input type=number or numeric-only mask to avoid mixed types in DB."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter3.py", "/app/test_reports/iteration_3.json"],
+  "success_rate": {"backend": "100% (11/11 new + prior 27 unchanged)", "frontend": "100% (manifesto, home CTA, voice picker, atlas propose, editorial proposals tab, revise sources editor)"},
+  "test_credentials": "Admin editor@mahakali.org / Codex2026!  |  Reader reader@example.com / reader123 — both verified.",
+  "seed_data_creation": "Two tension-proposal rows submitted during tests (one approved -> permanently added to atlas per spec; one rejected). Proposition 1 has an attached source (A. Rao / Foundations / 2019 / peer-reviewed / CC-BY 4.0) and confidence=high from the evidence-ratings test.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Reader/admin login flow uses a plain <button>SIGN IN</button> (no type='submit'); use text selector 'button:has-text(\"SIGN IN\")' or press Enter on password field. Frontend token is not stored under localStorage keys 'token'/'auth_token' but auth still works (likely httpOnly cookie via AuthContext). Editorial Revise/retract tab requires clicking [data-testid=ed-tab-revise] and then loading a proposition number before revise-sources/add-source render. After iter3 tests, /api/atlas count is +1 vs iter2 baseline (approved proposal persisted).",
+  "rca of the issue": "N/A — no bugs found this iteration."
+}

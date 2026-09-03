@@ -7,9 +7,11 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 const NAV = [
+  { to: "/manifesto", label: "Manifesto", testid: "nav-manifesto" },
   { to: "/read", label: "The Books", testid: "nav-read" },
   { to: "/explore", label: "Explorer", testid: "nav-explore" },
   { to: "/map", label: "Map of Everything", testid: "nav-map" },
+  { to: "/atlas", label: "Contradiction Atlas", testid: "nav-atlas" },
   { to: "/changes", label: "The Book Changes", testid: "nav-changes" },
   { to: "/audit", label: "Scripture Audit", testid: "nav-audit" },
   { to: "/ask", label: "Ask the Book", testid: "nav-ask" },
@@ -41,8 +43,8 @@ export function Layout({ children }) {
         <div className="max-w-[1400px] mx-auto px-4 sm:px-8 lg:px-12 h-16 flex items-center justify-between gap-4">
           <Link to="/" data-testid="nav-home" className="flex items-center gap-2.5 shrink-0">
             <span className="w-8 h-8 border border-gold flex items-center justify-center text-gold"><BookOpen size={16} /></span>
-            <span className="font-head font-extrabold tracking-tight text-ink text-sm leading-none hidden sm:block">
-              THE HOLY BOOK<br /><span className="text-gold">THE BOOK OF INFINITY</span>
+            <span className="font-head font-extrabold tracking-tight text-ink text-base leading-none hidden sm:block">
+              HOLY BOOK
             </span>
           </Link>
 

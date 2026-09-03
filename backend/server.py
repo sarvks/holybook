@@ -7,9 +7,17 @@ load_dotenv(ROOT_DIR / ".env")
 
 import logging
 import uuid
+import json
+import hashlib
+import io
+import zipfile
+import tempfile
+import shutil
 from datetime import datetime, timezone
 
+import requests
 from fastapi import FastAPI, APIRouter, HTTPException, Request, Depends, Query, Response
+from fastapi.responses import StreamingResponse
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, EmailStr, Field
@@ -19,7 +27,7 @@ from auth import (
     hash_password, verify_password, create_access_token,
     public_user, make_auth_deps,
 )
-from corpus import build_corpus, build_graph
+import importer as archive_importer
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -82,6 +90,7 @@ class ReviseIn(BaseModel):
     note: str
     confidence: Optional[str] = None
     status: Optional[str] = None
+    sources: Optional[List[dict]] = None
 
 
 class RetractIn(BaseModel):
@@ -89,18 +98,39 @@ class RetractIn(BaseModel):
 
 
 # ------------------------- Seeding -------------------------
+CORPUS_JSON = ROOT_DIR / "corpus_data.json"
+
+
 async def seed_corpus():
     count = await db.propositions.count_documents({})
     if count > 0:
         return
-    logger.info("Seeding corpus...")
-    books, chapters, propositions = build_corpus()
-    graph = build_graph(books, propositions)
-    await db.books.insert_many([dict(b) for b in books])
-    await db.chapters.insert_many([dict(c) for c in chapters])
-    await db.propositions.insert_many([dict(p) for p in propositions])
-    await db.graph.insert_one({"_id": "concept-graph", **graph})
-    logger.info(f"Seeded {len(books)} books, {len(chapters)} chapters, {len(propositions)} propositions.")
+    logger.info("Seeding corpus from archive snapshot...")
+    data = json.loads(CORPUS_JSON.read_text())
+    await load_corpus_into_db(data, "Holy Book.zip")
+    logger.info(f"Seeded {len(data['books'])} books, {len(data['chapters'])} chapters, {len(data['propositions'])} propositions.")
+
+
+async def load_corpus_into_db(data, source_name):
+    await db.books.delete_many({})
+    await db.chapters.delete_many({})
+    await db.propositions.delete_many({})
+    await db.graph.delete_many({})
+    await db.tensions.delete_many({})
+    await db.manifesto.delete_many({})
+    await db.books.insert_many([dict(b) for b in data["books"]])
+    await db.chapters.insert_many([dict(c) for c in data["chapters"]])
+    await db.propositions.insert_many([dict(p) for p in data["propositions"]])
+    await db.graph.insert_one({"_id": "concept-graph", **data["graph"]})
+    await db.tensions.insert_one({"_id": "atlas", "items": data.get("tensions", [])})
+    if data.get("manifesto"):
+        await db.manifesto.insert_one({"_id": "manifesto", "entries": data["manifesto"]})
+    await db.import_meta.replace_one(
+        {"_id": "meta"},
+        {"_id": "meta", "source": source_name, "imported_at": datetime.now(timezone.utc).isoformat(),
+         "books": len(data["books"]), "chapters": len(data["chapters"]), "propositions": len(data["propositions"])},
+        upsert=True,
+    )
 
 
 async def seed_users():
@@ -245,9 +275,10 @@ async def stats():
     retracted = sum(1 for p in props if p.get("status") == "retracted")
     contradiction_props = sum(1 for p in props if p.get("contradicts"))
     reading = sum(p.get("reading_minutes", 0) for p in props)
-    conf = {"high": 0, "moderate": 0, "contested": 0}
+    conf = {"high": 0, "moderate": 0, "contested": 0, "unrated": 0}
     for p in props:
-        conf[p.get("confidence", "moderate")] = conf.get(p.get("confidence", "moderate"), 0) + 1
+        c = p.get("confidence", "unrated")
+        conf[c] = conf.get(c, 0) + 1
     return {
         "books": books, "chapters": chapters, "propositions": len(props),
         "citations": citations, "revisions": revisions,
@@ -264,6 +295,7 @@ async def validation():
     books = await db.books.count_documents({})
     chapters = await db.chapters.count_documents({})
     props = await db.propositions.count_documents({})
+    meta = await db.import_meta.find_one({"_id": "meta"}) or {}
     claimed = {
         "books": int(os.environ.get("CLAIMED_BOOKS", 12)),
         "chapters": int(os.environ.get("CLAIMED_CHAPTERS", 144)),
@@ -278,9 +310,11 @@ async def validation():
             "delta": actual[k] - claimed[k],
         })
     return {
-        "source_archive": "sample-corpus (generated)",
-        "note": "No source archive was provided at build time. This is a transparent, generated sample corpus. "
-                "When the real 'Holy Book.zip' is imported the same reconciliation runs against its actual contents.",
+        "source_archive": meta.get("source", "Holy Book.zip"),
+        "imported_at": meta.get("imported_at"),
+        "note": "Imported from the source archive 'Holy Book.zip'. Totals are counted directly from the ingested "
+                "Markdown (each chapter's '##' sections are propositions). Where the actual count differs from the "
+                "claimed figure, the difference is shown transparently rather than hidden or padded.",
         "checks": checks,
         "all_match": all(c["match"] for c in checks),
         "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -623,6 +657,8 @@ async def revise_proposition(number: int, body: ReviseIn, user: dict = Depends(r
         updates["confidence"] = body.confidence
     if body.status:
         updates["status"] = body.status
+    if body.sources is not None:
+        updates["sources"] = body.sources
     await db.propositions.update_one(
         {"number": number},
         {"$set": updates, "$push": {"revisions": revision}})
@@ -645,6 +681,219 @@ async def retract_proposition(number: int, body: RetractIn, user: dict = Depends
         {"number": number},
         {"$set": {"status": "retracted"}, "$push": {"revisions": revision}})
     return {"ok": True}
+
+
+@api.get("/atlas")
+async def atlas():
+    doc = await db.tensions.find_one({"_id": "atlas"}) or {"items": []}
+    items = doc.get("items", [])
+    themes = {}
+    for t in items:
+        themes.setdefault(t["theme"], []).append(t)
+    return {
+        "count": len(items),
+        "themes": [{"theme": k, "links": v} for k, v in sorted(themes.items())],
+        "note": "These are editorially-framed thematic tensions between real propositions in the corpus. "
+                "The pairing is a framing device to surface where the book argues with itself; the text itself "
+                "is not altered, and editors can add or remove tensions.",
+    }
+
+
+@api.get("/manifesto")
+async def manifesto():
+    doc = await db.manifesto.find_one({"_id": "manifesto"}) or {"entries": []}
+    return {"entries": doc.get("entries", []),
+            "note": "The Opening Manifesto is front matter: the book's declarations and clauses, including its "
+                    "own anti-prophet and obsolescence clauses. It frames the thesis as a position to be tested."}
+
+
+class TensionProposalIn(BaseModel):
+    a_number: int
+    b_number: int
+    theme: str = Field(min_length=2)
+    rationale: str = Field(min_length=15)
+
+
+@api.post("/atlas/proposals")
+async def propose_tension(body: TensionProposalIn, user: dict = Depends(get_current_user)):
+    if body.a_number == body.b_number:
+        raise HTTPException(status_code=400, detail="Choose two different propositions")
+    a = await db.propositions.find_one({"number": body.a_number}, {"_id": 0})
+    b = await db.propositions.find_one({"number": body.b_number}, {"_id": 0})
+    if not a or not b:
+        raise HTTPException(status_code=404, detail="One or both propositions were not found")
+    doc = {
+        "id": str(uuid.uuid4()), "user_id": str(user["_id"]), "user_name": user.get("name", "Reader"),
+        "theme": body.theme.strip().lower(), "rationale": body.rationale,
+        "a_number": body.a_number, "b_number": body.b_number,
+        "a_title": a["title"], "b_title": b["title"],
+        "status": "pending", "editor_note": "",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.tension_proposals.insert_one(dict(doc))
+    return {"proposal": doc}
+
+
+@api.get("/me/tension-proposals")
+async def my_tension_proposals(user: dict = Depends(get_current_user)):
+    return {"proposals": await db.tension_proposals.find(
+        {"user_id": str(user["_id"])}, {"_id": 0}).sort("created_at", -1).to_list(200)}
+
+
+@api.get("/editorial/tension-proposals")
+async def editorial_tension_proposals(status: Optional[str] = None, user: dict = Depends(require_role("editor", "admin"))):
+    filt = {"status": status} if status else {}
+    return {"proposals": await db.tension_proposals.find(filt, {"_id": 0}).sort("created_at", -1).to_list(500)}
+
+
+@api.post("/editorial/tension-proposals/{pid}/decision")
+async def decide_tension_proposal(pid: str, body: DecisionIn, user: dict = Depends(require_role("editor", "admin"))):
+    if body.decision not in ("approved", "rejected"):
+        raise HTTPException(status_code=400, detail="decision must be 'approved' or 'rejected'")
+    prop = await db.tension_proposals.find_one({"id": pid})
+    if not prop:
+        raise HTTPException(status_code=404, detail="Proposal not found")
+    if body.decision == "approved":
+        a = await db.propositions.find_one({"number": prop["a_number"]}, {"_id": 0})
+        b = await db.propositions.find_one({"number": prop["b_number"]}, {"_id": 0})
+        if a and b:
+            link = {
+                "theme": prop["theme"],
+                "a": {"book_title": a["book_title"], "book_slug": a["book_slug"],
+                      "chapter_number": a["chapter_number"], "chapter_title": a["chapter_title"], "proposition_number": a["number"]},
+                "b": {"book_title": b["book_title"], "book_slug": b["book_slug"],
+                      "chapter_number": b["chapter_number"], "chapter_title": b["chapter_title"], "proposition_number": b["number"]},
+                "contributed_by": prop["user_name"],
+            }
+            await db.tensions.update_one({"_id": "atlas"}, {"$push": {"items": link}}, upsert=True)
+            await db.propositions.update_one({"number": a["number"]}, {"$addToSet": {"contradicts": b["number"]}})
+            await db.propositions.update_one({"number": b["number"]}, {"$addToSet": {"contradicts": a["number"]}})
+    await db.tension_proposals.update_one(
+        {"id": pid}, {"$set": {"status": body.decision, "editor_note": body.editor_note or "",
+                               "decided_by": user.get("name"), "decided_at": datetime.now(timezone.utc).isoformat()}})
+    return {"ok": True}
+
+
+class TTSIn(BaseModel):
+    text: str = Field(min_length=1)
+    voice: str = Field(default="onyx")
+
+
+@api.post("/tts")
+async def tts(body: TTSIn):
+    import re as _re
+    text = _re.sub(r"[*_#>~`|]", "", body.text)
+    text = _re.sub(r"\s+", " ", text).strip()[:4000]
+    if not text:
+        raise HTTPException(status_code=400, detail="Nothing to read")
+    voice = body.voice if body.voice in {"alloy", "onyx", "sage", "fable", "nova", "echo", "shimmer", "coral", "ash"} else "onyx"
+    key = hashlib.sha256(f"{text}|{voice}|tts-1-hd|mp3".encode()).hexdigest()
+    cache_dir = ROOT_DIR / "tts_cache"
+    cache_dir.mkdir(exist_ok=True)
+    fpath = cache_dir / f"{key}.mp3"
+    if not fpath.exists():
+        try:
+            from emergentintegrations.llm.openai import OpenAITextToSpeech
+            tts_client = OpenAITextToSpeech(api_key=os.environ["EMERGENT_LLM_KEY"])
+            audio = await tts_client.generate_speech(text=text, model="tts-1-hd", voice=voice, response_format="mp3")
+            fpath.write_bytes(audio)
+        except Exception as e:
+            logger.error(f"TTS failed: {e}")
+            raise HTTPException(status_code=502, detail="Narration is temporarily unavailable.")
+    return Response(content=fpath.read_bytes(), media_type="audio/mpeg",
+                    headers={"Cache-Control": "public, max-age=31536000"})
+
+
+async def _retrieve(question: str, k: int = 6):
+    return await db.propositions.find(
+        {"$text": {"$search": question}},
+        {"_id": 0, "number": 1, "title": 1, "text": 1, "confidence": 1, "status": 1,
+         "book_title": 1, "sources": 1, "score": {"$meta": "textScore"}},
+    ).sort([("score", {"$meta": "textScore"})]).limit(k).to_list(k)
+
+
+def _ask_system():
+    return (
+        "You are 'Ask the Book', a retrieval-grounded assistant for a digital codex called The Holy Book — The Book of Infinity. "
+        "You may ONLY use the provided propositions as evidence. Rules: "
+        "1) Cite every claim inline using the tag [P<number>]. "
+        "2) If the propositions do not support an answer, say so plainly and refuse to speculate. "
+        "3) Report uncertainty honestly and note when a proposition is 'disputed' or 'retracted'. "
+        "4) Never assert the book's thesis (that it makes holy books obsolete) as established fact; present it as the book's position. "
+        "5) Be concise (max ~180 words). This is an AI answer grounded in published content; human editors approve canonical text."
+    )
+
+
+@api.post("/ask/stream")
+async def ask_stream(body: AskIn):
+    hits = await _retrieve(body.question)
+
+    async def gen():
+        if not hits:
+            refusal = ("I can only answer from the published propositions of this book, and I found nothing in the "
+                       "corpus that addresses your question. I will not speculate beyond the text.")
+            yield f"data: {json.dumps({'type': 'meta', 'grounded': False, 'grounding': [], 'citations': []})}\n\n"
+            for word in refusal.split(" "):
+                yield f"data: {json.dumps({'type': 'delta', 'content': word + ' '})}\n\n"
+            yield f"data: {json.dumps({'type': 'done'})}\n\n"
+            return
+
+        grounding = [{"number": h["number"], "title": h["title"], "confidence": h["confidence"],
+                      "status": h["status"], "book_title": h["book_title"], "sources": h.get("sources", [])} for h in hits]
+        yield f"data: {json.dumps({'type': 'meta', 'grounded': True, 'grounding': grounding, 'disclosure': 'AI-generated answer, grounded in published propositions. AI cannot publish canonical material.'})}\n\n"
+
+        context = "\n\n".join(
+            f"[P{h['number']}] ({h['confidence']} confidence, {h['status']}) {h['text'][:600]}" for h in hits)
+        prompt = f"PROPOSITIONS:\n{context}\n\nQUESTION: {body.question}\n\nAnswer using only the propositions above, with [P#] citations."
+        collected = ""
+        try:
+            from emergentintegrations.llm.chat import LlmChat, UserMessage, TextDelta, StreamDone
+            chat = LlmChat(api_key=os.environ["EMERGENT_LLM_KEY"], session_id=f"ask-{uuid.uuid4()}",
+                           system_message=_ask_system()).with_model("openai", "gpt-5.4")
+            async for ev in chat.stream_message(UserMessage(text=prompt)):
+                if isinstance(ev, TextDelta):
+                    collected += ev.content
+                    yield f"data: {json.dumps({'type': 'delta', 'content': ev.content})}\n\n"
+                elif isinstance(ev, StreamDone):
+                    break
+        except Exception as e:
+            logger.error(f"ask_stream failed: {e}")
+            yield f"data: {json.dumps({'type': 'error', 'content': 'Ask the Book is temporarily unavailable.'})}\n\n"
+            return
+        cited = [h["number"] for h in hits if f"P{h['number']}" in collected] or [h["number"] for h in hits[:3]]
+        yield f"data: {json.dumps({'type': 'citations', 'citations': cited})}\n\n"
+        yield f"data: {json.dumps({'type': 'done'})}\n\n"
+
+    return StreamingResponse(gen(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+class ImportIn(BaseModel):
+    url: str
+
+
+@api.post("/editorial/import")
+async def editorial_import(body: ImportIn, user: dict = Depends(require_role("admin"))):
+    tmp = tempfile.mkdtemp()
+    try:
+        r = requests.get(body.url, timeout=60)
+        if r.status_code != 200 or not r.content[:2] == b"PK":
+            raise HTTPException(status_code=400, detail="Could not download a valid ZIP from that URL.")
+        with zipfile.ZipFile(io.BytesIO(r.content)) as z:
+            z.extractall(tmp)
+        books, chapters, propositions, graph, tensions, manifesto = archive_importer.parse_archive(tmp)
+        data = {"books": books, "chapters": chapters, "propositions": propositions, "graph": graph,
+                "tensions": tensions, "manifesto": manifesto}
+        await load_corpus_into_db(data, "Holy Book.zip (re-import)")
+        return {"ok": True, "books": len(books), "chapters": len(chapters), "propositions": len(propositions),
+                "tensions": len(tensions)}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"import failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Import failed: {e}")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
 
 
 app.include_router(api)

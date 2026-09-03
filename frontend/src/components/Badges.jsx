@@ -4,6 +4,7 @@ const CONF = {
   high: { label: "High confidence", cls: "text-verified border-verified/40 bg-verified/5" },
   moderate: { label: "Moderate", cls: "text-gold border-gold/40 bg-gold/5" },
   contested: { label: "Contested", cls: "text-disputed border-disputed/40 bg-disputed/5" },
+  unrated: { label: "Not yet rated", cls: "text-ink-muted border-line bg-transparent" },
 };
 const STATUS = {
   established: { label: "Established", cls: "text-verified border-verified/40" },

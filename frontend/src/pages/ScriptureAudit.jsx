@@ -51,14 +51,14 @@ export default function ScriptureAudit() {
       </div>
 
       <div className="grid md:grid-cols-2 gap-4 mt-6">
-        <Link to="/read/book/143" data-testid="ch143-link" className="group border border-line bg-[var(--surface)] p-6 rounded-sm hover:border-gold transition-colors">
+        <Link to="/chapter/143" data-testid="ch143-link" className="group border border-line bg-[var(--surface)] p-6 rounded-sm hover:border-gold transition-colors">
           <ScrollText size={20} className="text-gold" />
-          <h3 className="font-head text-xl font-semibold text-ink mt-3 group-hover:text-gold">Chapter 143 — The Book Audits Itself</h3>
+          <h3 className="font-head text-xl font-semibold text-ink mt-3 group-hover:text-gold">Chapter 143 — The Book That Destroys This Book</h3>
           <p className="font-body text-lg text-ink-2 mt-1 leading-snug">The self-audit chapter, where the book turns its evidence rubric on its own claims.</p>
         </Link>
-        <Link to="/read/book/144" data-testid="ch144-link" className="group border border-line bg-[var(--surface)] p-6 rounded-sm hover:border-gold transition-colors">
+        <Link to="/chapter/144" data-testid="ch144-link" className="group border border-line bg-[var(--surface)] p-6 rounded-sm hover:border-gold transition-colors">
           <Flag size={20} className="text-gold" />
-          <h3 className="font-head text-xl font-semibold text-ink mt-3 group-hover:text-gold">Chapter 144 — The Book Ends and Does Not End</h3>
+          <h3 className="font-head text-xl font-semibold text-ink mt-3 group-hover:text-gold">Chapter 144 — Let Us Find Out</h3>
           <p className="font-body text-lg text-ink-2 mt-1 leading-snug">The finale, which closes without claiming to have concluded everything.</p>
         </Link>
       </div>

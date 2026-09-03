@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
 
 const WRAP = "max-w-[1400px] mx-auto px-4 sm:px-8 lg:px-12";
-const CONF = ["", "high", "moderate", "contested"];
+const CONF = ["", "high", "moderate", "contested", "unrated"];
 const STAT = ["", "established", "disputed", "retracted"];
 
 export default function Explorer() {
