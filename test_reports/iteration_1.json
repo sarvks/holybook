@@ -1,0 +1,46 @@
+{
+  "summary": "Comprehensive backend + frontend testing of 'The Book of Everything'. 30/30 pytest backend tests pass (stats, validation, books, chapters, propositions, search/filters/pagination, random, graph, changes, audit, register/login/me, Ask the Book grounded + refusal, personal library CRUD, challenges, editorial summary/list/decision/revise/retract, and 403 forbidden for reader on editorial). Frontend flows verified via Playwright: homepage renders live stats (12/144/1000/2526 citations) and non-infallibility statement; /read shows 12 book cards; book -> chapter -> reader flow works with Simple/Scholar controls; Explorer search returns results; Map of Everything renders both knowledge graph and accessible table; Editorial dashboard reachable after admin login and shows pending challenge queue with approve/reject actions; Ask the Book returns grounded answer containing [P#] citations.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "auth._extract_token", "issue": "Cookie is preferred over Authorization header. When both are present (e.g. after previous login left a cookie), the cookie wins and Bearer is ignored. Standard practice is to prefer explicit Authorization header. Not blocking but caused initial test flakiness with shared sessions."},
+      {"endpoint": "GET /api/library/bookmarks", "issue": "Not itself an issue but note: endpoint correctly requires auth (401 for anonymous); confirmed."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Router (App.js)", "issue": "No catch-all/404 route defined. Unmatched paths (e.g. /books, /read/1 where '1' is not a valid slug, /chapters/1) render only the Layout header/footer with an empty body and no user feedback.", "selector": "N/A", "priority": "MEDIUM"},
+      {"component": "ChapterView reader controls", "issue": "Spec references data-testid=\"reader-mode-toggle\" but the reader uses separate Simple/Scholar buttons without that testid. Functionality works but automated selectors from the spec do not match.", "selector": "[data-testid=reader-mode-toggle]", "priority": "LOW"},
+      {"component": "Books page slug expectation", "issue": "Review request expected slug 'mahakali-corpus' but actual seeded book slugs are 'origins','matter','life',... (12 books). API works; only the spec expectation is stale.", "selector": "[data-testid=book-card-mahakali-corpus]", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Books/empty-route pages", "issues": ["Blank content area on unmatched routes provides no navigation cue; add a NotFound component"]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "Add a catch-all Route path='*' returning a NotFound page (currently /books, /read/<invalid>, etc. render only header/footer).",
+    "Either add data-testid='reader-mode-toggle' to the Simple/Scholar controls, or update spec to point at the individual buttons.",
+    "(Optional) In auth._extract_token, prefer the Authorization Bearer header over the cookie so API clients aren't silently overridden by a stale cookie."
+  ],
+  "critical_code_review_comments": [
+    "server.py is ~660 lines and mixes models, seeding, and 25+ endpoints. Consider splitting into routers (auth, corpus, propositions, editorial, library, ask) for maintainability (>700-line threshold approaching).",
+    "The /ask endpoint returns 502 if emergentintegrations raises; consider a graceful degraded response with grounding hits so the UI can still display evidence when the LLM is momentarily unavailable.",
+    "Cookies are set with secure=true, samesite=none which is correct for the cross-site preview host; confirmed working. bcrypt hashes verified starting with $2b$ via successful login flow.",
+    "Frontend `Books.jsx` uses `b.reading_minutes` and `b.concepts` etc. without null-safety; would crash if API schema drifts. Non-blocking for current sample corpus."
+  ],
+  "updated_files": [
+    "/app/backend/tests/backend_test.py"
+  ],
+  "success_rate": {"backend": "100% (30/30)", "frontend": "~95% (all critical flows working; minor missing 404 route and testid mismatch)"},
+  "test_credentials": "Admin: editor@mahakali.org / Codex2026!  |  Reader: reader@example.com / reader123 (both verified working)",
+  "seed_data_creation": "None (backend self-seeds 12 books / 144 chapters / 1000 propositions and both users on startup). Test suite creates ephemeral challenges/notes/bookmarks and one register user per run; not cleaned up but scoped by unique user ids.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "backend_test.py under /app/backend/tests uses fresh requests.Session per test (session cookies leaking between admin+reader logins caused false failures earlier because backend prefers cookie over Bearer). Book slugs are 'origins','matter','life','pattern','time','language','society','value','knowledge','mind','continuity','book' — not 'mahakali-corpus'. Frontend uses /read routes, not /books. Reader Simple/Scholar are separate buttons, no combined toggle testid. Ask the Book relies on Mongo text-index; nonsense queries return grounded=false as designed.",
+  "rca of the issue": "Missing catch-all route: React Router v6 without a Route path='*' silently renders no element inside <Routes> for unmatched paths, leaving only the surrounding <Layout> visible. Reproduce: visit /books or /read/1 -> empty page. Mitigation: add <Route path='*' element={<NotFound />} /> in App.js."
+}

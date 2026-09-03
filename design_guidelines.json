@@ -1,0 +1,144 @@
+{
+  "project_identity": {
+    "name": "Holy Book / The Book of Everything — Digital Codex",
+    "creator": "Mahakali Studios (Owned editorially by Mahakali Tribe LLP)",
+    "archetype": "Swiss Architectural Editorial & Digital Codex Manuscript",
+    "core_premise": "A public, evidence-aware digital codex presenting the complete uploaded manuscript with editorial transparency. It presents provocative propositions without pretending 'makes holy books obsolete' is established fact, pairing rigorous citation systems with scholar/simple reading modes.",
+    "anti_patterns": [
+      "No generic SaaS gradient blue UI",
+      "No spiritual/denominational iconography or religious symbols",
+      "No centered text layout disease for body paragraphs",
+      "No transparent headers over content without optical blur",
+      "No unlabelled or un-grounded proposition cards"
+    ]
+  },
+  "color_system": {
+    "theme_strategy": "Ivory / Graphite Archival Codex with Dark Parchment option",
+    "light_palette": {
+      "background": "#FBF9F5",
+      "surface_elevated": "#F4F1EA",
+      "surface_card": "#EFECE4",
+      "border": "#E2DDD3",
+      "border_subtle": "#EDE8DF",
+      "text_primary": "#1A1A18",
+      "text_secondary": "#57554F",
+      "text_muted": "#858177",
+      "accent_gold": "#A37B3E",
+      "accent_gold_subtle": "#F7F2E6",
+      "status_verified": "#2A6B48",
+      "status_disputed": "#B46524",
+      "status_retracted": "#9E3430"
+    },
+    "dark_palette": {
+      "background": "#121211",
+      "surface_elevated": "#1A1A18",
+      "surface_card": "#222220",
+      "border": "#31302C",
+      "border_subtle": "#282724",
+      "text_primary": "#ECE8DF",
+      "text_secondary": "#B5B0A4",
+      "text_muted": "#7C786E",
+      "accent_gold": "#D4AF67",
+      "accent_gold_subtle": "#252016",
+      "status_verified": "#40916C",
+      "status_disputed": "#D97706",
+      "status_retracted": "#DC2626"
+    }
+  },
+  "typography": {
+    "heading_font": "'Outfit', 'Cinzel', 'Bebas Neue', sans-serif",
+    "body_font": "'Cormorant Garamond', 'Merriweather', 'Georgia', serif",
+    "mono_font": "'JetBrains Mono', 'Source Code Pro', monospace",
+    "font_loading_instructions": "Import Google Fonts: Outfit (500,700,800), Cormorant Garamond (400,400i,600,700), JetBrains Mono (400,500) into src/index.css",
+    "hierarchy": {
+      "h1_hero": "text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight leading-none uppercase",
+      "h2_section": "text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight",
+      "h3_subsection": "text-xl sm:text-2xl font-semibold tracking-normal",
+      "h4_card": "text-lg sm:text-xl font-medium",
+      "body_reader": "text-lg sm:text-xl leading-relaxed font-serif",
+      "body_ui": "text-base leading-normal font-sans",
+      "mono_label": "text-xs uppercase tracking-widest font-mono"
+    }
+  },
+  "spacing_and_layout": {
+    "grid_mode": "Swiss Archival Grid with Monastic Margins",
+    "bento_ratios": "col-span-12 for Hero Codices, col-span-8 / col-span-4 for Reader split pane, col-span-4 / col-span-4 / col-span-4 for Statistics & Contradictions",
+    "container_padding": "px-4 sm:px-8 lg:px-16 py-8 sm:py-16",
+    "card_padding": "p-6 sm:p-8",
+    "gap_scale": "gap-6 sm:gap-8 lg:gap-12"
+  },
+  "component_architecture": {
+    "navigation_bar": {
+      "style": "Sticky Archival Header with backdrop-blur-xl bg-[#FBF9F5]/90 dark:bg-[#121211]/90 border-b border-[#E2DDD3] dark:border-[#31302C]",
+      "items": [
+        "Brand Logo & Non-Infallibility Badge",
+        "Book Reader (Book -> Chapter -> Proposition)",
+        "Proposition Explorer",
+        "Map of Everything (Knowledge Graph)",
+        "The Book Changes & Self-Audit",
+        "Ask the Book (Grounded Q&A)",
+        "Scripture Audit",
+        "User Notes & Library",
+        "Editorial Dashboard (Mahakali Tribe LLP)"
+      ]
+    },
+    "reader_interface": {
+      "modes": ["Simple Mode (Focus reading, clean typography)", "Scholar Mode (Propositions, confidence scores, parallel citations, version history, margin notes)"],
+      "features": [
+        "Interactive Proposition Highlighting & Deep-linking",
+        "Escher Geometric Line Art Section Headers",
+        "Reading Progress Bar & Bookmark State",
+        "Quick Challenge Proposition Drawer",
+        "Text Scale and Theme Controls"
+      ]
+    },
+    "proposition_explorer": {
+      "filters": ["Confidence Level (High, Moderate, Contested)", "Status (Established, Disputed, Retracted)", "Topic Tag", "Search Query"],
+      "card_elements": [
+        "Proposition ID & Title",
+        "Confidence & Status Badge",
+        "Primary Text snippet",
+        "Count of Citations & Counterarguments",
+        "View Evidence & Revision History button"
+      ]
+    },
+    "map_of_everything": {
+      "visual_graph": "Interactive Canvas/SVG node network with drag/zoom support",
+      "accessible_alternative": "Searchable, sortable hierarchy table with level indents, filter by connection count"
+    },
+    "editorial_dashboard": {
+      "actions": [
+        "Batch Import Codex Data",
+        "Validate References & Sources",
+        "Review Community Proposition Challenges",
+        "Publish Revision / Retraction Notice"
+      ]
+    }
+  },
+  "image_urls": {
+    "manuscript_blueprint": "https://images.unsplash.com/photo-1721244653757-b76cc4679dfb?crop=entropy&cs=srgb&fm=jpg&q=85",
+    "architectural_elevation": "https://images.unsplash.com/photo-1721244653652-268631ec049a?crop=entropy&cs=srgb&fm=jpg&q=85",
+    "abstract_tangled_lines": "https://images.unsplash.com/photo-1716929157580-81212d1c3f13?crop=entropy&cs=srgb&fm=jpg&q=85",
+    "geometric_structural_frame": "https://images.unsplash.com/photo-1522932753915-9ee97e43e3d9?crop=entropy&cs=srgb&fm=jpg&q=85",
+    "archival_bound_volumes": "https://images.unsplash.com/photo-1585862705417-671ae64f0eb7?crop=entropy&cs=srgb&fm=jpg&q=85",
+    "curved_geometric_facade": "https://images.unsplash.com/photo-1486551937199-baf066858de7?crop=entropy&cs=srgb&fm=jpg&q=85",
+    "tessellated_mesh_pattern": "https://images.unsplash.com/photo-1524351543168-8e38787614e9?crop=entropy&cs=srgb&fm=jpg&q=85"
+  },
+  "accessibility_and_testing": {
+    "wcag_target": "WCAG 2.2 AA",
+    "contrast_ratio": "Minimum 4.5:1 for standard text, 3:1 for large display headers",
+    "reduced_motion": "Wrap Framer Motion animations with useReducedMotion checks or standard CSS media queries",
+    "keyboard_navigation": "Full focus-visible ring outline styling (ring-2 ring-[#A37B3E])",
+    "data_testid_convention": "All interactive elements must include kebab-case role attributes (e.g. data-testid='nav-book-reader-link', data-testid='scholar-mode-toggle', data-testid='proposition-card-prop-101')"
+  },
+  "instructions_to_main_agent": [
+    "Load Google Fonts ('Outfit', 'Cormorant Garamond', 'JetBrains Mono') in src/index.css",
+    "Implement light and dark mode toggle using standard Tailwind dark class",
+    "Ensure header navigation has data-testid for all links and actions",
+    "Create mock data for all 144 Chapters, statistics, citations, counterarguments, and revision logs if backend endpoints are not present",
+    "Add non-infallibility disclaimer clearly on the homepage hero section",
+    "Provide Scholar Mode and Simple Mode toggles in the Book Reader view",
+    "Provide both visual Graph view and Accessible Table view for 'Map of Everything'",
+    "Add Sonner toast notifications for user interactions (bookmarking, submitting challenges, note saving)"
+  ]
+}
